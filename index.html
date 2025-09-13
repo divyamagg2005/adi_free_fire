@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free Fire AI Photo Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background inspired by gaming */
+        }
+        .container {
+            max-width: 640px;
+            margin: auto;
+        }
+        #image-preview {
+            max-width: 100%;
+            height: auto;
+            display: none; /* Hidden by default */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-gray-800 rounded-xl shadow-lg p-6 w-full max-w-lg space-y-6 border border-yellow-500">
+        <h1 class="text-3xl font-bold text-center text-yellow-400">Free Fire AI Photo Generator</h1>
+
+        <div class="space-y-4">
+            <textarea id="prompt-input" rows="4" class="w-full p-4 text-sm text-white bg-gray-700 rounded-lg border border-gray-600 focus:ring-yellow-500 focus:border-yellow-500 transition-all" placeholder="e.g., 'A cinematic photo of DJ Alok on the Bermuda map, with a glowing aura'..."></textarea>
+
+            <button id="generate-button" class="w-full py-3 px-6 bg-red-600 text-white font-semibold rounded-lg shadow-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">
+                Generate Photo
+            </button>
+        </div>
+
+        <div id="status-message" class="text-center text-gray-400 italic"></div>
+
+        <div id="image-container" class="bg-gray-700 rounded-lg flex items-center justify-center min-h-64 overflow-hidden shadow-inner border border-dashed border-gray-600">
+            <img id="image-preview" src="" alt="Generated AI Photo" class="rounded-lg shadow-md w-full">
+            <p id="placeholder-text" class="text-gray-500 p-4 text-center">Your Free Fire photo will appear here.</p>
+        </div>
+    </div>
+
+    <script>
+        const promptInput = document.getElementById('prompt-input');
+        const generateButton = document.getElementById('generate-button');
+        const statusMessage = document.getElementById('status-message');
+        const imagePreview = document.getElementById('image-preview');
+        const placeholderText = document.getElementById('placeholder-text');
+
+        // This is a placeholder for the API key, which is automatically provided at runtime.
+        const apiKey = "";
+        
+        generateButton.addEventListener('click', async () => {
+            const prompt = promptInput.value.trim();
+            if (!prompt) {
+                statusMessage.textContent = 'Please enter a description to generate a photo.';
+                return;
+            }
+
+            // Show loading state
+            statusMessage.textContent = 'Generating Free Fire photo, please wait...';
+            imagePreview.style.display = 'none';
+            placeholderText.style.display = 'block';
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+            const payload = {
+                instances: { prompt: `A photo of a Garena Free Fire game character in the Free Fire game art style, based on the following description: ${prompt}` },
+                parameters: { sampleCount: 1 }
+            };
+
+            let retryCount = 0;
+            const maxRetries = 3;
+            const baseDelay = 1000;
+
+            const makeApiCall = async () => {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API response error: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                        const base64Data = result.predictions[0].bytesBase64Encoded;
+                        const imageUrl = `data:image/png;base64,${base64Data}`;
+                        imagePreview.src = imageUrl;
+                        imagePreview.style.display = 'block';
+                        placeholderText.style.display = 'none';
+                        statusMessage.textContent = 'Photo generated successfully!';
+                    } else {
+                        throw new Error('No image data found in the response.');
+                    }
+
+                } catch (error) {
+                    console.error('Failed to generate image:', error);
+                    if (retryCount < maxRetries) {
+                        retryCount++;
+                        const delay = baseDelay * Math.pow(2, retryCount - 1);
+                        statusMessage.textContent = `Error occurred. Retrying in ${delay / 1000} seconds... (${retryCount}/${maxRetries})`;
+                        setTimeout(makeApiCall, delay);
+                    } else {
+                        statusMessage.textContent = 'Failed to generate photo after multiple retries. Please try again.';
+                        placeholderText.style.display = 'block';
+                    }
+                }
+            };
+            
+            makeApiCall();
+        });
+    </script>
+</body>
+</html>
